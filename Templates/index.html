@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎬 VegaMovies Search</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 VegaMovies Search</h1>
+    <form id="searchForm">
+      <input id="query" name="query" placeholder="Search movie..." required>
+      <button type="submit">Search</button>
+    </form>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+  let lastTitle = "";
+
+  async function renderData(d) {
+    const resBox = document.getElementById("result");
+    if (d.error) {
+      resBox.innerHTML = "❌ Movie not found";
+      return;
+    }
+
+    lastTitle = d.title;
+
+    let h = `
+      <h2>${d.title}</h2>
+      <img src="${d.poster}" class="poster">
+      <p>${d.summary || ''}</p>
+    `;
+
+    if (d.screenshots && d.screenshots.length) {
+      h += "<div class='gallery'>";
+      d.screenshots.slice(0, 4).forEach(s => {
+        h += `<img src='${s}' class='shot'>`;
+      });
+      h += "</div>";
+    }
+
+    if (d.downloads && d.downloads.length) {
+      d.downloads.forEach(g => {
+        if (g.quality) h += `<div class='quality'>${g.quality}</div>`;
+        if (g.links && g.links.length) {
+          g.links.forEach(l => {
+            if (l.url.includes("nexdrive.pro")) {
+              h += `<a class='btn' href='${l.url}' target='_blank'>${l.label || 'Download'}</a>`;
+            }
+          });
+        }
+      });
+    }
+
+    resBox.innerHTML = h;
+  }
+
+  document.getElementById("searchForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const q = document.getElementById("query").value;
+    document.getElementById("result").innerHTML = "🔍 Searching...";
+    try {
+      const r = await fetch("/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "query=" + encodeURIComponent(q)
+      });
+      const d = await r.json();
+      await renderData(d);
+    } catch (err) {
+      document.getElementById("result").innerHTML = "⚠️ Network error!";
+    }
+  });
+
+  // ✅ Auto-refresh every 30 seconds if new data found
+  setInterval(async () => {
+    try {
+      const r = await fetch("/api/latest");
+      const d = await r.json();
+      if (d.title && d.title !== lastTitle) {
+        console.log("🔄 Auto-refresh: new movie detected!");
+        await renderData(d);
+      }
+    } catch (err) {
+      console.log("⚠️ Refresh error:", err);
+    }
+  }, 30000);
+  </script>
+</body>
+</html>
